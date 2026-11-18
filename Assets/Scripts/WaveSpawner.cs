@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Audio; // Requerido para usar AudioMixer y AudioMixerSnapshot
 
 public class WaveSpawner : MonoBehaviour
 {
@@ -28,12 +29,11 @@ public class WaveSpawner : MonoBehaviour
     private List<GameObject> remainingCodexPages = new List<GameObject>();
     private GameObject activeCodexInstance;
 
-    [Header("Configuración de Audio y Transiciones")]
-    [SerializeField] private AudioSource musicAudioSource;
-    [SerializeField] private AudioClip restMusic;
-    [SerializeField] private AudioClip battleMusic;
-    [SerializeField] private float musicFadeDuration = 1.0f;
-    private Coroutine fadeCoroutine;
+    [Header("Configuración de Audio con Snapshots")]
+    [SerializeField] private AudioMixer audioMixer;
+    [SerializeField] private AudioMixerSnapshot restSnapshot;
+    [SerializeField] private AudioMixerSnapshot battleSnapshot;
+    [SerializeField] private float musicTransitionDuration = 1.0f;
 
     private int currentWaveIndex = 0;
     private int activeEnemiesCount = 0;
@@ -159,7 +159,8 @@ public class WaveSpawner : MonoBehaviour
         isCountingDown = true;
         isWaveActive = false;
 
-        PlayMusic(restMusic);
+        // Cambiar al snapshot de descanso
+        PlayRestMusic();
 
         SpawnShopPod();
         SpawnConsumableItems();
@@ -178,7 +179,8 @@ public class WaveSpawner : MonoBehaviour
         activeWaveRemainingTime = currentWave.waveDuration;
         currentWaveTotalDuration = currentWave.waveDuration;
 
-        PlayMusic(battleMusic);
+        // Cambiar al snapshot de batalla
+        PlayBattleMusic();
 
         List<GameObject> enemiesToSpawn = BuildEnemyList(currentWave);
         totalEnemiesInCurrentWave = enemiesToSpawn.Count;
@@ -206,48 +208,22 @@ public class WaveSpawner : MonoBehaviour
         isSpawning = false;
     }
 
-    private void PlayMusic(AudioClip newClip)
+    // Hecho público para que la zona de ambiente pueda llamarlo al salir si estamos en descanso
+    public void PlayRestMusic()
     {
-        if (musicAudioSource != null && newClip != null)
+        if (restSnapshot != null)
         {
-            if (musicAudioSource.clip == newClip && musicAudioSource.isPlaying)
-                return;
-
-            if (fadeCoroutine != null)
-            {
-                StopCoroutine(fadeCoroutine);
-            }
-
-            fadeCoroutine = StartCoroutine(FadeAndSwitchMusic(newClip, musicFadeDuration));
+            restSnapshot.TransitionTo(musicTransitionDuration);
         }
     }
 
-    private IEnumerator FadeAndSwitchMusic(AudioClip newClip, float duration)
+    // Hecho público para que la zona de ambiente pueda llamarlo al salir si estamos en batalla
+    public void PlayBattleMusic()
     {
-        float startVolume = musicAudioSource.volume;
-
-        float timer = 0f;
-        while (timer < duration)
+        if (battleSnapshot != null)
         {
-            timer += Time.deltaTime;
-            musicAudioSource.volume = Mathf.Lerp(startVolume, 0f, timer / duration);
-            yield return null;
+            battleSnapshot.TransitionTo(musicTransitionDuration);
         }
-
-        musicAudioSource.Stop();
-        musicAudioSource.clip = newClip;
-        musicAudioSource.Play();
-
-        timer = 0f;
-        while (timer < duration)
-        {
-            timer += Time.deltaTime;
-            musicAudioSource.volume = Mathf.Lerp(0f, startVolume, timer / duration);
-            yield return null;
-        }
-
-        musicAudioSource.volume = startVolume;
-        fadeCoroutine = null;
     }
 
     private void SpawnShopPod()
